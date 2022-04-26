@@ -1,4 +1,4 @@
-## Email to PDF Converter[![Actions Status]
+## Email to PDF Converter
 
 This software can be used to convert email files (eml or msg) to pdf files. It can be used as a library, command line tool or desktop application with its GUI.
 
