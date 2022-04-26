@@ -1,0 +1,109 @@
+plugins {
+    id 'java'
+    id 'eclipse'
+
+    id 'checkstyle'
+    id 'com.github.spotbugs' version '4.5.1'
+
+    id 'jacoco'
+
+    id 'com.github.johnrengelman.shadow' version '6.0.0'
+    id 'com.github.ben-manes.versions' version '0.33.0'
+    id 'com.palantir.git-version' version '0.12.3'
+}
+
+sourceCompatibility = 1.7
+
+/* git version */
+def gitVersionDetails = versionDetails()
+version = gitVersionDetails.lastTag
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'cli.Main',
+                'Implementation-Title': 'Email to PDF Converter',
+                'Implementation-Version': archiveVersion.get() + "+${gitVersionDetails.branchName}.${gitVersionDetails.gitHash}"
+    }
+}
+
+shadowJar {
+    baseName = 'emailconverter'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.guava:guava:29.0-jre'
+    implementation 'com.sun.mail:javax.mail:1.6.2'
+    implementation 'com.beust:jcommander:1.78'
+    implementation 'org.apache.tika:tika-core:1.24.1'
+    implementation 'com.github.markusbernhardt:proxy-vole:1.0.5'
+    implementation 'org.simplejavamail:simple-java-mail:6.5.2'
+    implementation 'org.simplejavamail:outlook-module:6.5.2'
+    implementation 'org.slf4j:slf4j-simple:1.7.30'
+
+    testImplementation 'junit:junit:4.+'
+    testImplementation 'org.hamcrest:hamcrest-all:1.+'
+    testImplementation 'com.github.stefanbirkner:system-rules:1.+'
+}
+
+/* launch4j launch configuration */
+task launch4j_rename(type: Copy) {
+    from "build/libs/emailconverter-${version}-all.jar"
+    into 'build/libs/'
+    rename { String fileName -> 'emailconverter.jar' }
+}
+launch4j_rename.mustRunAfter shadowJar
+
+task launch4j(type: Exec) {
+    workingDir '.'
+
+    //on windows:
+    commandLine 'launch4jc', 'gradle/resources/launch4j.xml'
+}
+launch4j.dependsOn launch4j_rename
+
+task launch4j_gui(type: Exec) {
+    workingDir '.'
+
+    //on windows:
+    commandLine 'launch4jc', 'gradle/resources/launch4j_gui.xml'
+}
+launch4j.dependsOn launch4j_rename
+
+/* custom jar build task */
+task dist(type: Copy) {
+}
+dist.dependsOn shadowJar, launch4j, launch4j_gui
+
+/* innosetup generation */
+task innosetup(type: Exec) {
+    workingDir '.'
+    commandLine 'iscc', "/dMyAppVersion=${version}", 'gradle/resources/innosetup.iss'
+}
+innosetup.dependsOn dist
+
+/* jacoco configuration */
+check.dependsOn jacocoTestReport, dependencyUpdates
+jacocoTestReport.mustRunAfter test
+dependencyUpdates.mustRunAfter jacocoTestReport
+
+/* checkstyle configuration */
+checkstyle {
+    configFile = file("src/test/resources/checkstyle.xml")
+}
+
+/* spotbugs configuration */
+spotbugs {
+    effort 'max'
+    reportLevel 'high'
+}
+
+spotbugsMain {
+    reports {
+        xml.enabled = false
+        html.enabled = true
+    }
+}
